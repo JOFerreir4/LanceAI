@@ -19,8 +19,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
+      - name: Set up Java
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -38,31 +38,31 @@ jobs:
           fi
 
           rm -rf extracted
-          echo "ZIP extracted successfully"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --licenses
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
 
-      - name: Prepare Android SDK
-        run: |
-          yes | sdkmanager --licenses
-          sdkmanager "platforms;android-36" "build-tools;36.0.0"
-
-      - name: Build LanceAI APK
-        run: |
-          gradle --no-daemon :app:assembleDebug
+      - name: Build APK
+        run: gradle --no-daemon :app:assembleDebug
 
       - name: Commit extracted project
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "Extract LanceAI project files"
+          commit_message: "Extract LanceAI project"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: LanceAI-APK
           path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
           retention-days: 14
