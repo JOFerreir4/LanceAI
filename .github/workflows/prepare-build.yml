@@ -15,10 +15,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,52 +25,55 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Extract LanceAI ZIP
+      - name: Extract ZIP
         run: |
           set -e
           mkdir -p extracted
           unzip -oq LanceAI-estrutura-inicial.zip -d extracted
 
-          if [ -d extracted/LanceAI ]; then
-            cp -a extracted/LanceAI/. .
-          else
-            cp -a extracted/. .
-          fi
+          echo "Arquivos encontrados:"
+          find extracted -name settings.gradle.kts
 
-          rm -rf extracted
-          rm -f .github/workflows/android-apk.yml
+          PROJECT_FILE=$(find extracted \
+            -name settings.gradle.kts | head -n 1)
 
-      - name: Configure Android SDK
-        run: |
-          set -e
-
-          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" \
-            -type f -name sdkmanager | sort -V | tail -n 1)
-
-          if [ -z "$SDKMANAGER" ]; then
-            echo "Android SDK Manager não encontrado"
+          if [ -z "$PROJECT_FILE" ]; then
+            echo "ERRO: settings.gradle.kts não encontrado"
+            find extracted -maxdepth 4 -type f
             exit 1
           fi
 
-          echo "SDK Manager: $SDKMANAGER"
+          PROJECT_DIR=$(dirname "$PROJECT_FILE")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-          yes | "$SDKMANAGER" --licenses || true
+          cp -a "$PROJECT_DIR"/. .
 
-          "$SDKMANAGER" \
-            "platforms;android-36" \
-            "build-tools;36.0.0" \
-            "platform-tools"
+          echo "Projeto preparado na raiz."
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
 
-      - name: Build LanceAI APK
+      - name: Verify project
+        run: |
+          ls -la
+          test -f settings.gradle.kts
+          test -f app/build.gradle.kts
+
+      - name: Build APK
         run: |
           gradle --no-daemon :app:assembleDebug
 
-      - name: Commit extracted project
+      - name: Commit project
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "Prepare LanceAI Android project"
