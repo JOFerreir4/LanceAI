@@ -5,11 +5,11 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'LanceAI-estrutura-inicial.zip'
+      - 'LanceAI-v1.1-calculadora.zip'
       - '.github/workflows/prepare-build.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -29,17 +29,19 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Extract LanceAI ZIP
+      - name: Extract LanceAI 1.1
         run: |
           set -e
           mkdir -p extracted
-          unzip -oq LanceAI-estrutura-inicial.zip -d extracted
+
+          unzip -oq LanceAI-v1.1-calculadora.zip -d extracted
 
           PROJECT_FILE=$(find extracted \
             -name settings.gradle.kts | head -n 1)
 
           if [ -z "$PROJECT_FILE" ]; then
-            echo "Projeto Gradle não encontrado!"
+            echo "ERRO: Projeto Gradle não encontrado"
+            find extracted -maxdepth 5 -type f
             exit 1
           fi
 
@@ -57,6 +59,11 @@ jobs:
             SDKMANAGER=$(find "$ANDROID_HOME" \
               -type f -name sdkmanager \
               | sort -V | tail -n 1)
+          fi
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager não encontrado"
+            exit 1
           fi
 
           yes | "$SDKMANAGER" \
@@ -77,30 +84,23 @@ jobs:
         run: |
           test -f settings.gradle.kts
           test -f app/build.gradle.kts
-          echo "Projeto encontrado!"
+          echo "Projeto LanceAI 1.1 encontrado"
 
-      - name: Fix Coil 3 dependency
+      - name: Fix Coil dependency
         run: |
-          set -e
+          find app gradle -type f \
+            \( -name '*.kts' -o -name '*.toml' \) \
+            -exec sed -i \
+            's/io.coil-kt:coil-compose:3.3.0/io.coil-kt.coil3:coil-compose:3.3.0/g' {} \;
 
-          for file in app/build.gradle.kts gradle/libs.versions.toml; do
-            if [ -f "$file" ]; then
-              sed -i \
-                's/io.coil-kt:coil-compose:3.3.0/io.coil-kt.coil3:coil-compose:3.3.0/g' \
-                "$file"
-            fi
-          done
-
-          grep -RIn "coil-compose" app gradle || true
-
-      - name: Build LanceAI APK
+      - name: Build APK
         run: |
           gradle --no-daemon :app:assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: LanceAI-APK
+          name: LanceAI-APK-v1.1
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
