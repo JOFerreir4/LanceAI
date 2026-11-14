@@ -82,16 +82,22 @@ jobs:
 
       - name: Verify project
         run: |
+          set -e
           test -f settings.gradle.kts
           test -f app/build.gradle.kts
           echo "Projeto LanceAI 1.1 encontrado"
 
       - name: Fix Coil dependency
         run: |
-          find app gradle -type f \
+          set -e
+
+          find app -type f \
             \( -name '*.kts' -o -name '*.toml' \) \
             -exec sed -i \
             's/io.coil-kt:coil-compose:3.3.0/io.coil-kt.coil3:coil-compose:3.3.0/g' {} \;
+
+          echo "Verificando dependência Coil:"
+          grep -RIn "coil-compose" app || true
 
       - name: Build APK
         run: |
